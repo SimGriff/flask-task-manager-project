@@ -93,7 +93,10 @@ def profile(username):
         {"username": session["user"]})["username"]
 
     if session["user"]:
-        return render_template("profile.html", username=username)
+        # get all tasks added by user
+        tasks = list(mongo.db.tasks.find({"created_by": username}))
+        
+        return render_template("profile.html", username=username, tasks=tasks)
 
     return redirect(url_for("login"))
 
@@ -128,6 +131,9 @@ def add_task():
 
 @app.route("/edit_task/<task_id>", methods=["GET", "POST"])
 def edit_task(task_id):
+
+    task = mongo.db.tasks.find_one({"_id": ObjectId(task_id)})
+
     if request.method == "POST":
         is_urgent = "on" if request.form.get("is_urgent") else "off"
         submit = {
@@ -141,14 +147,13 @@ def edit_task(task_id):
         mongo.db.tasks.update({"_id": ObjectId(task_id)}, submit)
         flash("Task Successfully Updated")
 
-    task = mongo.db.tasks.find_one({"_id": ObjectId(task_id)})
     categories = mongo.db.categories.find().sort("category_name", 1)
     return render_template("edit_task.html", task=task, categories=categories)
 
 
 @app.route("/delete_task/<task_id>")
 def delete_task(task_id):
-    mongo.db.tasks.remove({"_id": ObjectId(task_id)})
+    mongo.db.tasks.delete_one({"_id": ObjectId(task_id)})
     flash("Task Successfully Deleted")
     return redirect(url_for("get_tasks"))
 
@@ -178,7 +183,7 @@ def edit_category(category_id):
         submit = {
             "category_name": request.form.get("category_name")
         }
-        mongo.db.categories.update({"_id": ObjectId(category_id)}, submit)
+        mongo.db.categories.One({"_id": ObjectId(category_id)}, submit)
         flash("Category Successfully Updated")
         return redirect(url_for("get_categories"))
 
@@ -197,3 +202,40 @@ if __name__ == "__main__":
     app.run(host=os.environ.get("IP"),
             port=int(os.environ.get("PORT")),
             debug=True)
+
+@app.route("/add_book", methods=["GET", "POST"])
+def add_book():
+    if request.method == "POST":
+            existing_book = mongo.db.books.find_one(
+                {"title": request.form.get("title").lower()}
+            )
+            # If book exists, display message and reload add_book
+            if existing_book:
+                flash("This book is already in our Library")
+                return redirect(url_for("add_book"))
+            # Insert new book, display message and redirect to library
+            else:
+                title = request.form.get("title")
+                book = {
+                    "title": title.lower(),
+                    "author": request.form.get("author").lower(),
+                    "synopsis": request.form.get("synopsis"),
+                    "series": is_series,
+                    "series_name": request.form.get("series_name").lower(),
+                    "genre": request.form.get("genre"),
+                    "cover_image": request.form.get("cover_image"),
+                    "rating": int(request.form.get("rating")),
+                    "review": request.form.get("review"),
+                    "added_by": session["user"]
+                    }
+                mongo.db.books.insert_one(book)
+                flash(
+                    "Thankyou for contributing to the library," +
+                    f' {title.title()} has now been added')
+                return redirect(url_for("library"))
+    # Use add_book template, passing in admin and genre
+    if "user" in session:
+        return render_template("add-book.html", genres=genres(), admin=admin())
+    else:
+        flash("You need to be signed in to do that")
+        return redirect(url_for("sign_in"))

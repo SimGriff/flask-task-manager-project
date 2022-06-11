@@ -3,6 +3,9 @@ $(document).ready(function () {
   $(".collapsible").collapsible();
   $(".tooltipped").tooltip();
   $("select").formSelect();
+  $(document).ready(function(){
+    $('.modal').modal();
+  });
   $(".datepicker").datepicker({
       format: "dd mmmm, yyyy",
       yearRange: 3,
